@@ -6,6 +6,7 @@ import logging
 
 from app.config import MCLogsConfig
 
+logger = logging.getLogger("minecraft.logWatcher")
 
 class SystemctlLogWatcher:
     WAIT_SECONDS_BEFORE_STOP:int = 60
@@ -25,6 +26,8 @@ class SystemctlLogWatcher:
         """Log izleyiciyi arka plan thread'i olarak başlatır."""
         if self._running:
             return
+
+        logger.debug("Starting to watch logs.")
 
         self._running = True
 
@@ -74,19 +77,23 @@ class SystemctlLogWatcher:
     def subscribe(self, callback: Callable[[str], None]) -> None:
         with self._lock:
             self.on_line.add(callback)
+            logger.debug("New client instance subscribed to watch logs")
 
             if self._stop_timer:
                 self._stop_timer.cancel()
                 self._stop_timer = None
 
         if not self._running:
+            logger.debug("Since First instance subscribed we starting logWatcher")
             self.start()
 
     def unsubscribe(self, callback: Callable[[str], None]) -> None:
         with self._lock:
             self.on_line.discard(callback)
+            logger.debug("A client instance unsubscribed from watch logs")
 
             if len(self.on_line) == 0 and self._stop_timer is None:
+                logger.debug(f"Since no subscribers left setting up timer to stop logWatcher ({self.WAIT_SECONDS_BEFORE_STOP}sn)")
                 self._stop_timer = threading.Timer(
                     self.WAIT_SECONDS_BEFORE_STOP, self._timer_stopped
                 )
@@ -97,6 +104,7 @@ class SystemctlLogWatcher:
         with self._lock:
             self._stop_timer = None
             if len(self.on_line) == 0:
+                logging.debug(f"stopping logWatcher after waiting ({self.WAIT_SECONDS_BEFORE_STOP}sn)")
                 self.stop()
 
     def stop(self) -> None:
@@ -118,3 +126,5 @@ class SystemctlLogWatcher:
         if self._thread and self._thread.is_alive():
             # Thread okuma yaparken stdout kapandığı için kendiliğinden düşecektir
             self._thread.join(timeout=1)
+
+        logger.debug("logWatcher Stopped")

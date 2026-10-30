@@ -39,11 +39,6 @@ class ApiKeyMeta(BaseModel):
         """Yetki denetimi yapan yardımcı metot"""
         return self.is_active and tag in self.tags
 
-class MCQueryConfig(BaseModel):
-    host: str
-    port:int = 25565
-    timeout: int
-
 class MCRconConfig(BaseModel):
     host: str
     port:int
@@ -57,7 +52,6 @@ class MCLogsConfig(BaseModel):
 class MinecraftServerConfig(BaseModel):
     host:str = "127.0.0.1"
     port:int = 25565
-    query: MCQueryConfig
     rcon: MCRconConfig
     logs: MCLogsConfig
     service_name:str
