@@ -4,12 +4,14 @@ import subprocess
 import threading
 import logging
 
+from app.config import MCLogsConfig
+
 
 class SystemctlLogWatcher:
     WAIT_SECONDS_BEFORE_STOP:int = 60
-    def __init__(self, service_name:str, buffer_size:int = 50):
-        self.service_name = service_name
-        self.buffer: deque[str] = deque(maxlen=buffer_size) 
+    def __init__(self, cfg: MCLogsConfig):
+        self.cfg = cfg
+        self.buffer: deque[str] = deque(maxlen=cfg.line_count) 
 
         self._process: Optional[subprocess.Popen] = None
         self._thread: Optional[threading.Thread] = None
@@ -28,8 +30,8 @@ class SystemctlLogWatcher:
 
         # -n 0 parametresi geçmişi atlayıp sadece yeni düşen logları dinler.
         # Geçmişten de log almak istersen -n parametresini kaldırabilirsin.
-        lines_arg = str(self.buffer.maxlen) if self.buffer.maxlen else "50"
-        cmd = ["journalctl", "-u", self.service_name, "-f", "-n", lines_arg]
+        lines_arg = str(self.cfg.line_count) if self.cfg.line_count else "50"
+        cmd = ["journalctl", "-u", self.cfg.service_name, "-f", "-n", lines_arg]
 
         self._process = subprocess.Popen(
             cmd,

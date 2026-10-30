@@ -1,9 +1,10 @@
 import subprocess
-from typing import ClassVar
+from typing import ClassVar, Optional
 
 from app.config import MinecraftServerConfig
 from app.minecraft.logwatcher import SystemctlLogWatcher
 from app.minecraft.query import MinecraftQuery
+from app.minecraft.rcon import MinecraftRCON
 
 
 class MinecraftInstance:
@@ -13,13 +14,14 @@ class MinecraftInstance:
         return cls.s_instance
 
     @classmethod
-    def get_instance(cls) -> "MinecraftInstance" | None:
+    def get_instance(cls) -> Optional["MinecraftInstance"]:
         return cls.s_instance
 
     def __init__(self, cfg: MinecraftServerConfig):
         self.cfg = cfg
-        self.logWatcher = SystemctlLogWatcher(cfg.service_name, 50)
-        self.queryManager = MinecraftQuery(cfg.host, cfg.query.port)
+        self.logWatcher = SystemctlLogWatcher(cfg.logs)
+        self.queryManager = MinecraftQuery(cfg.query)
+        self.rcon       = MinecraftRCON(cfg.rcon)
 
     def get_args(self, action:str):
         return ["sudo", "systemctl", action, self.cfg.service_name]

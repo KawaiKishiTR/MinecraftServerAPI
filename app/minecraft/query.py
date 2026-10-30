@@ -1,10 +1,11 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import List, Optional
-from dataclasses import Field
 import asyncio
 import logging
 import struct
 import os
+
+from app.config import MCQueryConfig
 
 
 
@@ -92,10 +93,8 @@ class _QueryProtocol(asyncio.DatagramProtocol):
 class MinecraftQuery:
     FETCH_INTERVAL: int = 15
 
-    def __init__(self, host: str, port: int = 25565, timeout: float = 3.0):
-        self.host = host
-        self.port = port
-        self.timeout = timeout
+    def __init__(self, cfg: MCQueryConfig):
+        self.cfg = cfg
         self.session_id = struct.unpack(">i", os.urandom(4))[0] & 0x0F0F0F0F
         
         self._stat_cache: Optional[MinecraftServerStat] = None
@@ -107,12 +106,12 @@ class MinecraftQuery:
         loop = asyncio.get_running_loop()
         transport, protocol = await loop.create_datagram_endpoint(
             lambda: _QueryProtocol(),
-            remote_addr=(self.host, self.port)
+            remote_addr=(self.cfg.host, self.cfg.port)
         )
         protocol.future = loop.create_future()
         try:
             transport.sendto(packet)
-            return await asyncio.wait_for(protocol.future, timeout=self.timeout)
+            return await asyncio.wait_for(protocol.future, timeout=self.cfg.timeout)
         finally:
             transport.close()
 
@@ -159,7 +158,7 @@ class MinecraftQuery:
             try:
                 await self.fetch_full_stat()
             except Exception as e:
-                logger.warning(f"Query polling hatası ({self.host}:{self.port}): {e}")
+                logger.warning(f"Query polling hatası ({self.cfg.host}:{self.cfg.port}): {e}")
             await asyncio.sleep(self.FETCH_INTERVAL)
 
     def start(self):

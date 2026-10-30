@@ -1,20 +1,17 @@
 import asyncio
+import socket
+import subprocess
 
 from fastapi import Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 
 from app.minecraft.query import MinecraftServerStat
+from app.minecraft.rcon import RconPayload
 from app.routers.main import protected_router, verify_api_key, verify_api_key_permission
 from app.config import ApiKeyMeta, PermissionTag
 from app.minecraft.instance import MinecraftInstance
 
-protected_router.post("/action/start", status_code=status.HTTP_200_OK)
-async def start(current_key: ApiKeyMeta = Depends(verify_api_key)):
-    if (not current_key.has_permission(PermissionTag.START)):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Erişim engellendi! Bu işlem için Başlatma yetkisine sahip olmalısınız"
-        )
-
+@protected_router.post("/action/start", status_code=status.HTTP_200_OK)
+async def start(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.START))):
     if MinecraftInstance.get_instance().start():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -28,14 +25,8 @@ async def start(current_key: ApiKeyMeta = Depends(verify_api_key)):
     }
 
 
-protected_router.post("/action/stop", status.HTTP_200_OK)
-async def stop(current_key: ApiKeyMeta = Depends(verify_api_key)):
-    if (not current_key.has_permission(PermissionTag.STOP)):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Erişim engellendi! Bu işlem için Durdurma yetkisine sahip olmalısınız"
-        )
-
+@protected_router.post("/action/stop", status_code=status.HTTP_200_OK)
+async def stop(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.STOP))):
     if MinecraftInstance.get_instance().stop():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -49,14 +40,8 @@ async def stop(current_key: ApiKeyMeta = Depends(verify_api_key)):
     }
 
 
-protected_router.post("/action/restart", status.HTTP_200_OK)
-async def restart(current_key: ApiKeyMeta = Depends(verify_api_key)):
-    if (not current_key.has_permission(PermissionTag.RESTART)):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Erişim engellendi! Bu işlem için Yeniden Başlatma yetkisine sahip olmalısınız"
-        )
-
+@protected_router.post("/action/restart", status_code=status.HTTP_200_OK)
+async def restart(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RESTART))):
     if MinecraftInstance.get_instance().restart():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -70,9 +55,8 @@ async def restart(current_key: ApiKeyMeta = Depends(verify_api_key)):
     }
 
 
-protected_router.websocket("/action/get_logtail")
+@protected_router.websocket("/action/get_logtail")
 async def logs(websocket:WebSocket, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.LOGS))):
-    
     await websocket.accept()
 
     instance = MinecraftInstance.get_instance()
@@ -105,8 +89,71 @@ async def logs(websocket:WebSocket, current_key: ApiKeyMeta = Depends(verify_api
         # İstemci koptuğunda abonelikten çıkar (60 sn timer başlar)
         watcher.unsubscribe(on_new_log)
 
+# ----------------------------------------------------
+# GERİYE DÖNÜK UYUMLULUK FONKSİYONU VAKTİ GELİNCE SİL
+##TODO:-----------------------------------------------
+@protected_router.get("/status")
+async def get_server_status(current_key: ApiKeyMeta = Depends(verify_api_key)):
+    if (MinecraftInstance.get_instance().is_service_active()):
+        return {
+            "status": "success",
+            "message": "Minecraft sunucusu Aktif",
+            "started_by": current_key.name
+        }
 
-protected_router.get("/action/get_server_status",
+    return {
+        "status": "success",
+        "message": "Minecraft sunucusu Kapalı",
+        "started_by": current_key.name
+    }
+
+# ----------------------------------------------------
+# GERİYE DÖNÜK UYUMLULUK FONKSİYONU VAKTİ GELİNCE SİL
+##TODO:-----------------------------------------------
+@protected_router.get("/logs")
+async def get_server_logs(lines: int = 50, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.LOGS))):
+    cmd = ["sudo", "journalctl", "-u", MinecraftInstance.get_instance().cfg.service_name, "-n", str(lines), "--no-pager"]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    if result.returncode != 0:
+        return f"Loglar alinirken hata olustu: {result.stderr.strip()}"
+
+    return result.stdout
+
+# ----------------------------------------------------
+# GERİYE DÖNÜK UYUMLULUK FONKSİYONU VAKTİ GELİNCE SİL
+##TODO:-----------------------------------------------
+@protected_router.post("/command")
+async def send_rcon_command(payload: RconPayload, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RCON))):
+    clean_command = payload.command.strip()
+    if clean_command.startswith("/"):
+        clean_command = clean_command[1:]
+
+    try:
+        output = MinecraftInstance.get_instance().rcon.execute(clean_command)
+        return {
+            "command": clean_command,
+            "response": output if output else "Komut calistirildi (Donus yok)."
+        }
+
+    except (ConnectionRefusedError, socket.timeout):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RCON baglantisi saglanamadi veya zaman asimina ugradi. Oyun sunucusu kapali olabilir."
+        )
+    except PermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="RCON sifresi yanlis."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Hata: {str(e)}"
+        )
+
+
+@protected_router.get("/action/get_query_data",
     response_model=MinecraftServerStat, summary="Sunucu durumunu döner")
 async def get_server_status(
         fresh:bool = Query(
