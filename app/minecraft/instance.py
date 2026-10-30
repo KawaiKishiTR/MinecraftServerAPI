@@ -20,7 +20,7 @@ class MinecraftInstance:
     def __init__(self, cfg: MinecraftServerConfig):
         self.cfg = cfg
         self.logWatcher = SystemctlLogWatcher(cfg.logs)
-        self.queryManager = MinecraftQuery(cfg.query)
+        self.queryManager = MinecraftQuery(cfg)
         self.rcon       = MinecraftRCON(cfg.rcon)
 
     def get_args(self, action:str):
