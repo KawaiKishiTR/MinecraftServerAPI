@@ -15,4 +15,4 @@ if __name__ == "__main__":
     setup_logging()
 
     from app.app import fastapi
-    uvicorn.run(fastapi, host=cfg.server.host, port=cfg.server.port, reload=cfg.server.debug)
+    uvicorn.run("app:app", host=cfg.server.host, port=cfg.server.port, reload=cfg.server.debug)
