@@ -119,6 +119,7 @@ class MinecraftQuery:
         packet = struct.pack(">HBi", 0xFEFD, 0x09, self.session_id)
         data = await self._send_and_receive(packet)
         token_str = data[5:].decode("latin-1").rstrip("\x00")
+        logger.debug("Handshake Made with minecraft instance")
         return int(token_str)
 
     async def fetch_full_stat(self) -> MinecraftServerStat:
@@ -157,6 +158,8 @@ class MinecraftQuery:
         while self._running:
             try:
                 await self.fetch_full_stat()
+            except asyncio.TimeoutError:
+                logger.warning(f"Query zaman aşımına uğradı ({self.cfg.host}:{self.cfg.port}) - Sunucu UDP yanıtı vermiyor.")
             except Exception as e:
                 logger.warning(f"Query polling hatası ({self.cfg.host}:{self.cfg.port}): {e}")
             await asyncio.sleep(self.FETCH_INTERVAL)

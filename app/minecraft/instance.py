@@ -1,3 +1,4 @@
+import logging
 import subprocess
 from typing import ClassVar, Optional
 
@@ -5,7 +6,6 @@ from app.config import MinecraftServerConfig
 from app.minecraft.logwatcher import SystemctlLogWatcher
 from app.minecraft.query import MinecraftQuery
 from app.minecraft.rcon import MinecraftRCON
-
 
 class MinecraftInstance:
     s_instance: ClassVar["MinecraftInstance"] = None
@@ -51,5 +51,6 @@ class MinecraftInstance:
         result = subprocess.run(["sudo", "systemctl", "is-active", self.cfg.service_name], capture_output=True, text=True)
 
         if (result.returncode == 0):
-            return result.stdout == "active"
+            logging.getLogger("minecraft.instance").debug(f"[is_service_active] {result.stdout.strip()}")
+            return result.stdout.strip() == "active"
         return 0
