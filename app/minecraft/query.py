@@ -101,7 +101,7 @@ class MinecraftQuery:
                 "hostport": self.cfg.port,
                 "hostip": self.cfg.host,
                 "players": [p.name for p in status.players.sample] if status.players.sample else [],
-                "favicon": status.favicon,
+                "favicon": status.icon,
                 "ping_ms": round(status.latency) if status.latency else 0
             }
 
