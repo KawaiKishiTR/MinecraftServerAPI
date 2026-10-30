@@ -1,4 +1,4 @@
-from typing import ClassVar, Dict, Any, Set
+from typing import ClassVar, Dict, Any, Optional, Set
 from pydantic import BaseModel, Field
 from pathlib import Path
 from enum import StrEnum, auto
@@ -13,11 +13,11 @@ DEFAULT_CONFIG_DIR  = CONFIG_DIR / "defaults"
 # 0. Tag Yetkileri
 # ---------------------------------------------------------
 class PermissionTag(StrEnum):
-    RCON = auto()
-    LOGS = auto()
-    START = auto()
-    STOP = auto()
-    RESTART = auto()
+    RCON = "RCON"
+    LOGS = "LOGS"
+    START = "START"
+    STOP = "STOP"
+    RESTART = "RESTART"
 
 # ---------------------------------------------------------
 # 1. Pydantic Modelleri (Şemanız)
@@ -40,28 +40,34 @@ class ApiKeyMeta(BaseModel):
         return self.is_active and tag in self.tags
 
 class MCQueryConfig(BaseModel):
+    host: str
     port:int = 25565
+    timeout: int
 
 class MCRconConfig(BaseModel):
+    host: str
     port:int
-    key:str
+    timeout: int
+    password:str
+
+class MCLogsConfig(BaseModel):
+    service_name:str
+    line_count:int
 
 class MinecraftServerConfig(BaseModel):
     host:str = "127.0.0.1"
     port:int = 25565
-    service_name:str
     query: MCQueryConfig
     rcon: MCRconConfig
+    logs: MCLogsConfig
+    service_name:str
 
 
 class AppConfig(BaseModel):
     s_instance:ClassVar["AppConfig"] = None
-    def __new__(mcs, cls_name, bases, namespace, __pydantic_generic_metadata__ = None, __pydantic_reset_parent_namespace__ = True, _create_model_module = None, **kwargs):
-        mcs.s_instance = super().__new__(cls_name, bases, namespace, __pydantic_generic_metadata__, __pydantic_reset_parent_namespace__, _create_model_module, **kwargs)
-        return mcs.s_instance
 
     @classmethod
-    def get_instance(cls) -> "AppConfig" | None:
+    def get_instance(cls) -> Optional["AppConfig"]:
         return cls.s_instance
 
     app_name: str
@@ -116,7 +122,7 @@ def load_config(filename: str) -> AppConfig:
     merged_dict = _deep_merge(default_data, custom_data)
 
     # Sözlüğü Pydantic nesnesine dönüştür ve doğrula
-    return AppConfig.model_validate(merged_dict)
-    
+    AppConfig.s_instance = AppConfig.model_validate(merged_dict)
+    return AppConfig.s_instance
 
 
