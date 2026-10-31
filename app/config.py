@@ -13,11 +13,17 @@ DEFAULT_CONFIG_DIR  = CONFIG_DIR / "defaults"
 # 0. Tag Yetkileri
 # ---------------------------------------------------------
 class PermissionTag(StrEnum):
-    RCON = "RCON"
-    LOGS = "LOGS"
+    # Minecraft Server Control
     START = "START"
     STOP = "STOP"
     RESTART = "RESTART"
+
+    # Minecraft Server Admin
+    LOGS = "LOGS"
+    RCON = "RCON"
+
+    # System Developer Admin
+    ADMIN = "ADMIN"
 
 # ---------------------------------------------------------
 # 1. Pydantic Modelleri (Şemanız)
@@ -69,6 +75,7 @@ class AppConfig(BaseModel):
     server: ServerConfig
     logger: LoggerConfig
     minecraft: MinecraftServerConfig
+    version_folder:str
     # API key (string) -> ApiKeyMeta nesnesi
     api_keys: Dict[str, ApiKeyMeta] = Field(default_factory=dict)
 

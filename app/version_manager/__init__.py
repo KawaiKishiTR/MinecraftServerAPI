@@ -1,0 +1,2 @@
+from app.version_manager.versionManager import VersionManager
+from app.version_manager.versionObject import VersionObject

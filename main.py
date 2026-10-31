@@ -14,5 +14,10 @@ if __name__ == "__main__":
     from app.logger import setup_logging
     setup_logging()
 
+
+    from app.version_manager import VersionManager
+    VersionManager(os.environ["APP_ROOT_DIR"] / cfg.version_folder)
+
+
     from app.app import fastapi
     uvicorn.run(fastapi, host=cfg.server.host, port=cfg.server.port)
