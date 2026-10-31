@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from app.version_manager import VersionObject
+from app.version_manager.versionObject import VersionObject
 
 logger = logging.getLogger("version.manager")
 
