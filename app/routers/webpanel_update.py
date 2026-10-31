@@ -11,7 +11,7 @@ from app.version_manager.versionObject import VersionObject
 
 @protected_router.get("/version/{version_name}/{file_name:path}", status_code=status.HTTP_200_OK)
 async def check_update(version_name:str, file_name:str, current_key: ApiKeyMeta = Depends(verify_api_key)):
-    vers:VersionObject = VersionManager.get_instance().get_version_dict().get(version_name)
+    vers:VersionObject = (await VersionManager.get_instance().get_version_dict()).get(version_name)
     if vers is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -47,6 +47,7 @@ async def check_update(version_name:str, file_name:str, current_key: ApiKeyMeta 
 @protected_router.post("/version/update_manifests", status_code=status.HTTP_200_OK)
 async def update_manifests(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.ADMIN))):
     await VersionManager.get_instance().update_manifests()
+    VersionManager.get_instance().invalidate_cache()
 
     return {
         "status": "ok"
