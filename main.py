@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
 
     from app.version_manager import VersionManager
-    VersionManager(os.environ["APP_ROOT_DIR"] / cfg.version_folder)
+    VersionManager(Path(os.environ["APP_ROOT_DIR"]) / cfg.version_folder)
 
 
     from app.app import fastapi
