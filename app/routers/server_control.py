@@ -120,9 +120,6 @@ async def get_server_logs(lines: int = 50, current_key: ApiKeyMeta = Depends(ver
 
     return result.stdout
 
-# ----------------------------------------------------
-# GERİYE DÖNÜK UYUMLULUK FONKSİYONU VAKTİ GELİNCE SİL
-##TODO:-----------------------------------------------
 @protected_router.post("/command")
 async def send_rcon_command(payload: RconPayload, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RCON))):
     clean_command = payload.command.strip()

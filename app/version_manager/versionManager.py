@@ -23,7 +23,7 @@ class VersionManager:
         return [v for v in versions if v.is_valid()]
 
     def get_version_dict(self) -> dict[str: VersionObject]:
-        return {v.data.version_name: v for v in self.get_version_list()}
+        return {v.version_name(): v for v in self.get_version_list()}
 
     async def update_manifests(self) -> None:
         for version in self.get_version_list():
