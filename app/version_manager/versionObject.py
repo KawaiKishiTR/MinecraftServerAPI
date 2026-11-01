@@ -72,7 +72,7 @@ class VersionObject:
     async def update_manifest(self):
         await asyncio.to_thread(self._sync_update_manifests)
 
-    async def _sync_update_manifests(self):
+    def _sync_update_manifests(self):
         file_list = sorted(get_relative_flat_file_list(self.dir), key=lambda x: str(x))
         file_hash_table = {}
 
