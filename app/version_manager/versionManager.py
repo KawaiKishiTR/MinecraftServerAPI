@@ -32,6 +32,6 @@ class VersionManager:
         return {v.version_name(): v for v in await self.get_version_list()}
 
     async def update_manifests(self) -> None:
-        for version in self.get_version_list():
+        for version in await self.get_version_list():
             await version.update_manifest()
 
