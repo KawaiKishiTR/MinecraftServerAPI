@@ -15,7 +15,7 @@ class ServerStaticInfo(BaseModel):
     version: str
     maxplayers: int
     hostip: str
-    hostport: int
+    hostport: str
     favicon: Optional[str] = None
 
 class PlayerInfo(BaseModel):
@@ -31,7 +31,7 @@ async def get_server_info():
     return {
         "hostname": stat.hostname,
         "version": stat.version,
-        "maxplayers": stat.maxplayers,
+        "maxplayers": str(stat.maxplayers),
         "hostip": stat.hostip,
         "hostport": stat.hostport,
         "favicon": stat.favicon,
