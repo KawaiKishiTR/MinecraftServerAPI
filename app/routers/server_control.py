@@ -56,15 +56,7 @@ async def restart(current_key: ApiKeyMeta = Depends(verify_api_key_permission(Pe
 
 
 @protected_router.websocket("/minecraft/get_logtail")
-async def logs(websocket:WebSocket):
-    # 1. Başlığı doğrudan WebSocket handshake'inden oku
-    api_key = websocket.headers.get("x-api-key")
-
-    # Eğer key geçersiz veya LOGS yetkisi yoksa bağlantıyı reddet:
-    if not api_key or not verify_api_key_permission(PermissionTag.LOGS)(api_key):
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-    
+async def logs(websocket:WebSocket, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.LOGS))):
     await websocket.accept()
 
     instance = MinecraftInstance.get_instance()
