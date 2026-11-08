@@ -10,7 +10,7 @@ from app.routers.main import protected_router, verify_api_key, verify_api_key_pe
 from app.config import ApiKeyMeta, PermissionTag
 from app.minecraft.instance import MinecraftInstance
 
-@protected_router.post("/action/start", status_code=status.HTTP_200_OK)
+@protected_router.post("/minecraft/start", status_code=status.HTTP_200_OK)
 async def start(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.START))):
     if MinecraftInstance.get_instance().start():
         raise HTTPException(
@@ -25,7 +25,7 @@ async def start(current_key: ApiKeyMeta = Depends(verify_api_key_permission(Perm
     }
 
 
-@protected_router.post("/action/stop", status_code=status.HTTP_200_OK)
+@protected_router.post("/minecraft/stop", status_code=status.HTTP_200_OK)
 async def stop(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.STOP))):
     if MinecraftInstance.get_instance().stop():
         raise HTTPException(
@@ -40,7 +40,7 @@ async def stop(current_key: ApiKeyMeta = Depends(verify_api_key_permission(Permi
     }
 
 
-@protected_router.post("/action/restart", status_code=status.HTTP_200_OK)
+@protected_router.post("/minecraft/restart", status_code=status.HTTP_200_OK)
 async def restart(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RESTART))):
     if MinecraftInstance.get_instance().restart():
         raise HTTPException(
@@ -55,7 +55,7 @@ async def restart(current_key: ApiKeyMeta = Depends(verify_api_key_permission(Pe
     }
 
 
-@protected_router.websocket("/action/get_logtail")
+@protected_router.websocket("/minecraft/get_logtail")
 async def logs(websocket:WebSocket, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.LOGS))):
     await websocket.accept()
 
@@ -107,6 +107,35 @@ async def get_server_status(current_key: ApiKeyMeta = Depends(verify_api_key)):
         "started_by": current_key.name
     }
 
+@protected_router.post("/minecraft/send_command")
+async def send_rcon_command(payload: RconPayload, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RCON))):
+    clean_command = payload.command.strip()
+    if clean_command.startswith("/"):
+        clean_command = clean_command[1:]
+
+    try:
+        output = MinecraftInstance.get_instance().rcon.execute(clean_command)
+        return {
+            "command": clean_command,
+            "response": output if output else "Komut calistirildi (Donus yok)."
+        }
+
+    except (ConnectionRefusedError, socket.timeout):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RCON baglantisi saglanamadi veya zaman asimina ugradi. Oyun sunucusu kapali olabilir."
+        )
+    except PermissionError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="RCON sifresi yanlis."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Hata: {str(e)}"
+        )
+
 # ----------------------------------------------------
 # GERİYE DÖNÜK UYUMLULUK FONKSİYONU VAKTİ GELİNCE SİL
 ##TODO:-----------------------------------------------
@@ -119,6 +148,50 @@ async def get_server_logs(lines: int = 50, current_key: ApiKeyMeta = Depends(ver
         return f"Loglar alinirken hata olustu: {result.stderr.strip()}"
 
     return result.stdout
+
+@protected_router.post("/action/start", status_code=status.HTTP_200_OK)
+async def start(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.START))):
+    if MinecraftInstance.get_instance().start():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Başlatma işlemi başarısız oldu logları kontrol edin"
+        )
+    
+    return {
+        "status": "success",
+        "message": "Minecraft sunucusu başarıyla başlatıldı",
+        "started_by": current_key.name
+    }
+
+
+@protected_router.post("/action/stop", status_code=status.HTTP_200_OK)
+async def stop(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.STOP))):
+    if MinecraftInstance.get_instance().stop():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Durdurma işlemi başarısız oldu logları kontrol edin"
+        )
+    
+    return {
+        "status": "success",
+        "message": "Minecraft sunucusu başarıyla durduruldu",
+        "started_by": current_key.name
+    }
+
+
+@protected_router.post("/action/restart", status_code=status.HTTP_200_OK)
+async def restart(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RESTART))):
+    if MinecraftInstance.get_instance().restart():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Yeniden Başlatma işlemi başarısız oldu logları kontrol edin"
+        )
+    
+    return {
+        "status": "success",
+        "message": "Minecraft sunucusu başarıyla Yeniden Başlatıldı",
+        "started_by": current_key.name
+    }
 
 @protected_router.post("/command")
 async def send_rcon_command(payload: RconPayload, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RCON))):
@@ -149,36 +222,3 @@ async def send_rcon_command(payload: RconPayload, current_key: ApiKeyMeta = Depe
             detail=f"Hata: {str(e)}"
         )
 
-
-@protected_router.get("/action/get_query_data",
-    response_model=MinecraftServerStat, summary="Sunucu durumunu döner")
-async def get_server_status(
-        fresh:bool = Query(
-            default=False,
-            description="True verilirse cache atlanır ve anlık UDP sorgusu yapılır.")
-        ):
-    if fresh:
-        try:
-            return await MinecraftInstance.get_instance().queryManager.fetch_full_stat()
-        except asyncio.TimeoutError:
-            raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail="Minecraft sunucusundan query yanıtı alınamadı (Zaman aşımı)."
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Sorgulama hatası: {str(e)}"
-            )
-
-    cached = MinecraftInstance.get_instance().queryManager.get_cached_stat()
-    if cached is None:
-        # Cache henüz dolmamışsa ilk veriyi çekmeyi dene
-        try:
-            return await MinecraftInstance.get_instance().queryManager.fetch_full_stat()
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Sunucu istatistikleri henüz hazır değil."
-            )
-    return cached

@@ -23,7 +23,7 @@ class PlayerInfo(BaseModel):
 # ----------------------------
 #  STATIC ENDPOINT (Tek İstek)
 # ----------------------------
-@protected_router.get("/server/info", response_model=ServerStaticInfo)
+@protected_router.get("/server/query/info", response_model=ServerStaticInfo)
 async def get_server_info():
     stat = get_stat()
     return {
@@ -36,7 +36,7 @@ async def get_server_info():
 # ----------------------------
 #  DYNAMIC ENDPOINT (Polling İçin)
 # ----------------------------
-@protected_router.get("/server/playerinfo", response_model=PlayerInfo)
+@protected_router.get("/server/query/playerinfo", response_model=PlayerInfo)
 async def get_server_playerinfo():
     stat = get_stat()
     return {
