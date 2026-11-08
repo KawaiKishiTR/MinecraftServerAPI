@@ -34,7 +34,7 @@ class SystemctlLogWatcher:
         # -n 0 parametresi geçmişi atlayıp sadece yeni düşen logları dinler.
         # Geçmişten de log almak istersen -n parametresini kaldırabilirsin.
         lines_arg = str(self.cfg.line_count) if self.cfg.line_count else "50"
-        cmd = ["journalctl", "-u", self.cfg.service_name, "-f", "-n", lines_arg]
+        cmd = ["journalctl", "-u", self.cfg.service_name, "-f", "-o", "cat", "-n", lines_arg]
 
         self._process = subprocess.Popen(
             cmd,
