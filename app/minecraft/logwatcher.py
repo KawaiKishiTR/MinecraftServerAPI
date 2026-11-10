@@ -39,7 +39,7 @@ class SystemctlLogWatcher:
         self._process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,  # Çıktıyı str (string) olarak çözer
             bufsize=1,  # Line buffering (satır bazlı iletim)
         )
@@ -117,10 +117,12 @@ class SystemctlLogWatcher:
                 self._stop_timer = None
 
         if self._process:
-            self._process.terminate()
             try:
-                self._process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
+                if self._process.stdout:
+                    self._process.stdout.close()
+                self._process.terminate()
+                self._process.wait(timeout=1)
+            except Exception:
                 self._process.kill()
 
         if self._thread and self._thread.is_alive():

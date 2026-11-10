@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import socket
 import subprocess
 
@@ -67,24 +68,30 @@ async def logs(websocket:WebSocket, current_key: ApiKeyMeta = Depends(verify_api
 
     watcher = instance.logWatcher
     loop = asyncio.get_running_loop()
-    log_queue: asyncio.Queue[str] = asyncio.Queue()
+    log_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=20)
 
     # Thread'den gelen logları FastAPI event loop'una güvenle aktaran callback
     def on_new_log(line: str) -> None:
-        loop.call_soon_threadsafe(log_queue.put_nowait, line)
-
+        try:
+            loop.call_soon_threadsafe(log_queue.put_nowait, line)
+        except asyncio.QueueFull:
+            pass
+    
     # 1. Tampondaki (buffer) geçmiş logları gönder
     for past_log in watcher.get_logs():
         await websocket.send_text(past_log)
 
     # 2. Abone ol (İlk abone ise watcher.start() otomatik tetiklenir)
     watcher.subscribe(on_new_log)
+
     try:
         while True:
             line = await log_queue.get()
             await websocket.send_text(line)
     except (WebSocketDisconnect, ConnectionResetError):
         pass
+    except Exception as e:
+        logging.error(f"WebSocket log akışında beklenmeyen hata: {e}")
     finally:
         # İstemci koptuğunda abonelikten çıkar (60 sn timer başlar)
         watcher.unsubscribe(on_new_log)

@@ -20,4 +20,4 @@ if __name__ == "__main__":
 
 
     from app.app import fastapi
-    uvicorn.run(fastapi, host=cfg.server.host, port=cfg.server.port)
+    uvicorn.run(fastapi, host=cfg.server.host, port=cfg.server.port, ws_ping_interval=20, ws_ping_timeout=20)
