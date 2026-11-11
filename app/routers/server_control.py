@@ -73,7 +73,7 @@ async def logs(websocket:WebSocket, current_key: ApiKeyMeta = Depends(ApiKeyPerm
 
     watcher = instance.logWatcher
     loop = asyncio.get_running_loop()
-    log_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=20)
+    log_queue: asyncio.Queue[str] = asyncio.Queue(maxsize=200)
 
     # Thread'den gelen logları FastAPI event loop'una güvenle aktaran callback
     def on_new_log(line: str) -> None:
