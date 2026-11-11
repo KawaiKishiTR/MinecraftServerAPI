@@ -116,6 +116,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "mcstatus" },
     { name = "pyyaml" },
+    { name = "starlette" },
     { name = "uvicorn" },
 ]
 
@@ -124,6 +125,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.162.0" },
     { name = "mcstatus", specifier = ">=14.2.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "starlette", specifier = ">=1.10.0" },
     { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
