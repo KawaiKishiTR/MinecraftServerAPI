@@ -1,3 +1,5 @@
+from typing import Sequence
+
 from fastapi import APIRouter, Depends, Request
 from fastapi import Security, HTTPException, status
 from fastapi.security import APIKeyHeader
@@ -8,7 +10,7 @@ from app.audit_logging import audit_logger
 # 2. Header tanımı (Swagger UI'da Authorize kutusu çıkarır)
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=False)
 
-def verify_api_key_permission(*tags: PermissionTag):
+def verify_api_key_permission(tags: Sequence[PermissionTag] = ()):
     def dependency(request: Request, key:str = Security(api_key_header)) -> ApiKeyMeta:
         if not key:
             raise HTTPException(
