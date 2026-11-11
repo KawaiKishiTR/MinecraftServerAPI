@@ -9,5 +9,5 @@ dependencies = [
     "mcstatus>=14.2.0",
     "pyyaml>=6.0.3",
     "starlette>=1.10.0",
-    "uvicorn>=0.54.0",
+    "uvicorn[standard]>=0.54.0",
 ]
