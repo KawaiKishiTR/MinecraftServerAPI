@@ -1,24 +1,24 @@
 import asyncio
 import logging
 import socket
-import subprocess
 
-from fastapi import Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import Depends, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 
-from app.minecraft.query import MinecraftServerStat
 from app.minecraft.rcon import RconPayload
-from app.routers.main import protected_router, verify_api_key, verify_api_key_permission
+from app.routers.main import protected_router, verify_api_key_permission
 from app.config import ApiKeyMeta, PermissionTag
 from app.minecraft.instance import MinecraftInstance
 
 @protected_router.post("/minecraft/start", status_code=status.HTTP_200_OK)
-async def start(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.START))):
+async def start(request:Request, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.START))):
     if MinecraftInstance.get_instance().start():
+        request.state.log_audit("500 INTERNAL SERVER ERROR", "Sunucu başlatma işlemi başarısız")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Başlatma işlemi başarısız oldu logları kontrol edin"
         )
-    
+
+    request.state.log_audit("200 OK")
     return {
         "status": "success",
         "message": "Minecraft sunucusu başarıyla başlatıldı",
@@ -27,13 +27,15 @@ async def start(current_key: ApiKeyMeta = Depends(verify_api_key_permission(Perm
 
 
 @protected_router.post("/minecraft/stop", status_code=status.HTTP_200_OK)
-async def stop(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.STOP))):
+async def stop(request:Request, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.STOP))):
     if MinecraftInstance.get_instance().stop():
+        request.state.log_audit("500 INTERNAL SERVER ERROR", "Sunucu durdurma işlemi başarısız")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Durdurma işlemi başarısız oldu logları kontrol edin"
         )
-    
+
+    request.state.log_audit("200 OK")
     return {
         "status": "success",
         "message": "Minecraft sunucusu başarıyla durduruldu",
@@ -42,13 +44,15 @@ async def stop(current_key: ApiKeyMeta = Depends(verify_api_key_permission(Permi
 
 
 @protected_router.post("/minecraft/restart", status_code=status.HTTP_200_OK)
-async def restart(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RESTART))):
+async def restart(request:Request, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RESTART))):
     if MinecraftInstance.get_instance().restart():
+        request.state.log_audit("500 INTERNAL SERVER ERROR", "Sunucu yeniden başlatma işlemi başarısız")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Yeniden Başlatma işlemi başarısız oldu logları kontrol edin"
         )
-    
+
+    request.state.log_audit("200 OK")
     return {
         "status": "success",
         "message": "Minecraft sunucusu başarıyla Yeniden Başlatıldı",
@@ -96,134 +100,34 @@ async def logs(websocket:WebSocket, current_key: ApiKeyMeta = Depends(verify_api
         # İstemci koptuğunda abonelikten çıkar (60 sn timer başlar)
         watcher.unsubscribe(on_new_log)
 
-# ----------------------------------------------------
-# GERİYE DÖNÜK UYUMLULUK FONKSİYONU VAKTİ GELİNCE SİL
-##TODO:-----------------------------------------------
-@protected_router.get("/status")
-async def get_server_status(current_key: ApiKeyMeta = Depends(verify_api_key)):
-    if (MinecraftInstance.get_instance().is_service_active()):
-        return {
-            "status": "success",
-            "message": "Minecraft sunucusu Aktif",
-            "started_by": current_key.name
-        }
-
-    return {
-        "status": "success",
-        "message": "Minecraft sunucusu Kapalı",
-        "started_by": current_key.name
-    }
-
 @protected_router.post("/minecraft/send_command")
-async def send_rcon_command(payload: RconPayload, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RCON))):
+async def send_rcon_command(request: Request, payload: RconPayload, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RCON))):
     clean_command = payload.command.strip()
     if clean_command.startswith("/"):
         clean_command = clean_command[1:]
 
     try:
         output = MinecraftInstance.get_instance().rcon.execute(clean_command)
+        request.state.log_audit("200 OK")
         return {
             "command": clean_command,
             "response": output if output else "Komut calistirildi (Donus yok)."
         }
 
     except (ConnectionRefusedError, socket.timeout):
+        request.state.log_audit("503 SERVICE UNAVAIL", "Rcon bağlanamadı oyun sunucusu kapalı olabilir")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="RCON baglantisi saglanamadi veya zaman asimina ugradi. Oyun sunucusu kapali olabilir."
         )
     except PermissionError:
+        request.state.log_audit("401 UNAUTHORIZED", "Sunucu Rcon şifresi yanlış")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="RCON sifresi yanlis."
         )
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Hata: {str(e)}"
-        )
-
-# ----------------------------------------------------
-# GERİYE DÖNÜK UYUMLULUK FONKSİYONU VAKTİ GELİNCE SİL
-##TODO:-----------------------------------------------
-@protected_router.get("/logs")
-async def get_server_logs(lines: int = 50, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.LOGS))):
-    cmd = ["sudo", "journalctl", "-u", MinecraftInstance.get_instance().cfg.service_name, "-n", str(lines), "--no-pager"]
-    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-    if result.returncode != 0:
-        return f"Loglar alinirken hata olustu: {result.stderr.strip()}"
-
-    return result.stdout
-
-@protected_router.post("/action/start", status_code=status.HTTP_200_OK)
-async def start(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.START))):
-    if MinecraftInstance.get_instance().start():
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Başlatma işlemi başarısız oldu logları kontrol edin"
-        )
-    
-    return {
-        "status": "success",
-        "message": "Minecraft sunucusu başarıyla başlatıldı",
-        "started_by": current_key.name
-    }
-
-
-@protected_router.post("/action/stop", status_code=status.HTTP_200_OK)
-async def stop(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.STOP))):
-    if MinecraftInstance.get_instance().stop():
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Durdurma işlemi başarısız oldu logları kontrol edin"
-        )
-    
-    return {
-        "status": "success",
-        "message": "Minecraft sunucusu başarıyla durduruldu",
-        "started_by": current_key.name
-    }
-
-
-@protected_router.post("/action/restart", status_code=status.HTTP_200_OK)
-async def restart(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RESTART))):
-    if MinecraftInstance.get_instance().restart():
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Yeniden Başlatma işlemi başarısız oldu logları kontrol edin"
-        )
-    
-    return {
-        "status": "success",
-        "message": "Minecraft sunucusu başarıyla Yeniden Başlatıldı",
-        "started_by": current_key.name
-    }
-
-@protected_router.post("/command")
-async def send_rcon_command(payload: RconPayload, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.RCON))):
-    clean_command = payload.command.strip()
-    if clean_command.startswith("/"):
-        clean_command = clean_command[1:]
-
-    try:
-        output = MinecraftInstance.get_instance().rcon.execute(clean_command)
-        return {
-            "command": clean_command,
-            "response": output if output else "Komut calistirildi (Donus yok)."
-        }
-
-    except (ConnectionRefusedError, socket.timeout):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="RCON baglantisi saglanamadi veya zaman asimina ugradi. Oyun sunucusu kapali olabilir."
-        )
-    except PermissionError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="RCON sifresi yanlis."
-        )
-    except Exception as e:
+        request.state.log_audit("500 INTERNAL SERVER ERROR", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Hata: {str(e)}"

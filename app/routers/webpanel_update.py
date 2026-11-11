@@ -1,16 +1,16 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
 
 
 from app.config import ApiKeyMeta, PermissionTag
-from app.routers.main import protected_router, verify_api_key, verify_api_key_permission
+from app.routers.main import protected_router, verify_api_key_permission
 from app.version_manager.versionManager import VersionManager
 from app.version_manager.versionObject import VersionObject
 
 
 
 @protected_router.get("/version/{version_name}/{file_name:path}", status_code=status.HTTP_200_OK)
-async def check_update(version_name:str, file_name:str, current_key: ApiKeyMeta = Depends(verify_api_key)):
+async def check_update(version_name:str, file_name:str, current_key: ApiKeyMeta = Depends(verify_api_key_permission())):
     vers:VersionObject = (await VersionManager.get_instance().get_version_dict()).get(version_name)
     if vers is None:
         raise HTTPException(
@@ -45,10 +45,11 @@ async def check_update(version_name:str, file_name:str, current_key: ApiKeyMeta 
 
 
 @protected_router.post("/version/update_manifests", status_code=status.HTTP_200_OK)
-async def update_manifests(current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.ADMIN))):
+async def update_manifests(request: Request, current_key: ApiKeyMeta = Depends(verify_api_key_permission(PermissionTag.ADMIN))):
     await VersionManager.get_instance().update_manifests()
     VersionManager.get_instance().invalidate_cache()
 
+    request.state.log_audit("200 OK")
     return {
         "status": "ok"
     }
