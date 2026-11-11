@@ -40,6 +40,7 @@ class VersionObject:
         return self
 
     def is_valid(self): # self.data doğru parse edilebiliyorsa geçerli bir versiyondur
+        logger.info(f"is_valid {self.data is not None} for {self.dir}")
         return self.data is not None
 
     def version_name(self):
@@ -48,6 +49,7 @@ class VersionObject:
     async def parse_manifest_file(self) -> Optional[VersionDataModel]:
         try:
             content = await self.get_manifest_content()
+            logger.info(f"parse manifest file {content=}")
             if not content:
                 return None
             mDICT = json.loads(content)
