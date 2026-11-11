@@ -62,8 +62,7 @@ class VersionObject:
     async def get_manifest_content(self) -> Optional[str]:
         mFILE = self.get_manifest()
         if not mFILE.exists():
-            return None
-
+            await self.update_manifest()
         return await asyncio.to_thread(mFILE.read_text, encoding="utf-8")
 
     def __eq__(self, other:"VersionObject") -> bool:
