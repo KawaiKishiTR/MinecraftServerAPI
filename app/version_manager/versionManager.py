@@ -25,9 +25,7 @@ class VersionManager:
     async def get_version_list(self) -> list[VersionObject]:
         if self._get_version_list_cache is None:
             versions = [await VersionObject(v).load() for v in self.vDir.iterdir() if v.is_dir()]
-            logger.info(f"{versions=}")
             self._get_version_list_cache = [v for v in versions if v.is_valid()]
-        logger.info(f"{self._get_version_list_cache=}")
         return self._get_version_list_cache
 
     async def get_version_dict(self) -> dict[str: VersionObject]:
